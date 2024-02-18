@@ -8,6 +8,15 @@ Created on Thu Feb  8 09:54:14 2024
 import pyxdf
 import mne
 
+### parameters
+highpass = 0.1
+lowpass  = 40
+electrodes = ['1','12','23'] # Fz, Pz, Cz electrodes respectively 
+                             # see streams[0]["info"] struct in variable explorer
+tMin = -0.2
+tMax = 0.5
+
+
 ### import Ground
 
 # load xdf file
@@ -50,6 +59,9 @@ for i in range(len(descriptions)):
     
 rawGround.annotations.append(onsets, [0] * len(onsets), descriptions)
 
+# filter
+rawGround = rawGround.copy().filter(highpass, lowpass)
+
 ### import plank
 
 fname = "C:/Users/seinj/Teaching/Recordings_2024_EEG/source-data/pb_07_oddball_plank.xdf"
@@ -90,6 +102,9 @@ for i in range(len(descriptions)):
     
 rawPlank.annotations.append(onsets, [0] * len(onsets), descriptions)
 
+# filter
+rawPlank = rawPlank.copy().filter(highpass, lowpass)
+
 ####
 
 # Convert annotations to events for 'stimulus:normal'
@@ -101,12 +116,12 @@ eventsOddG, eventIdsOddG = mne.events_from_annotations(rawGround, event_id={"odd
 eventsOddP, eventIdsOddP = mne.events_from_annotations(rawPlank, event_id={"oddP": 4}, regexp='oddP', use_rounding=True, chunk_duration=None, verbose=None)                            
 
 # Create mne.Epochs object for 'stimulus:normal'
-epochsNormalG = mne.Epochs(rawGround, eventsNormalG, event_id=eventIdsNormalG, tmin=-0.3, tmax=0.5, baseline=None)
-epochsNormalP = mne.Epochs(rawPlank, eventsNormalP, event_id=eventIdsNormalP, tmin=-0.3, tmax=0.5, baseline=None)
+epochsNormalG = mne.Epochs(rawGround, eventsNormalG, event_id=eventIdsNormalG, tmin=tMin, tmax=tMax, baseline=(None, 0))
+epochsNormalP = mne.Epochs(rawPlank, eventsNormalP, event_id=eventIdsNormalP, tmin=tMin, tmax=tMax, baseline=(None, 0))
 
 # Create mne.Epochs object for 'stimulus:odd'
-epochsOddG = mne.Epochs(rawGround, eventsOddG, event_id=eventIdsOddG, tmin=-0.3, tmax=0.5, baseline=None)
-epochsOddP = mne.Epochs(rawPlank, eventsOddP, event_id=eventIdsOddP, tmin=-0.3, tmax=0.5, baseline=None)
+epochsOddG = mne.Epochs(rawGround, eventsOddG, event_id=eventIdsOddG, tmin=tMin, tmax=tMax, baseline=(None, 0))
+epochsOddP = mne.Epochs(rawPlank, eventsOddP, event_id=eventIdsOddP, tmin=tMin, tmax=tMax, baseline=(None, 0))
 
 # Combine all four mne.Epochs objects
 epochsCombined = mne.concatenate_epochs([epochsNormalG, epochsNormalP, epochsOddG, epochsOddP])
@@ -125,13 +140,14 @@ evks = dict(zip(conds, [evokedNormG, evokedNormP, evokedOddG, evokedOddP]))
 def custom_func(x):
      return x.max(axis=1)
 
-for combine in ("mean", "median", "gfp", custom_func):
-     mne.viz.plot_compare_evokeds(evks, picks="eeg")#, combine=combine)
+#for combine in ("mean", "median", "gfp", custom_func):
+#    mne.viz.plot_compare_evokeds(evks, picks="eeg")#, combine=combine)
 
 # visualize the combined evoked responses    
 mne.viz.plot_compare_evokeds(
     evks,
-    picks = ['20'],
+    picks =  electrodes,
+    combine = "mean",
     colors=dict(oddG=1, oddP=1, normalG=0, normalP=0),
     linestyles=dict(normalG="solid",oddG="solid", oddP="dashed", normalP="dashed"),
     time_unit="ms",
